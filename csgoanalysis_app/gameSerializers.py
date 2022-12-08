@@ -1,18 +1,18 @@
 from rest_framework import serializers
 from .models import *
-from .modelsDto import *
+from .gameModelsDto import *
 
 
-class GameSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Game
-        fields = '__all__'
-
-
-class RoundSerializer(serializers.ModelSerializer):
-    class Meta:
-        model = Round
-        fields = '__all__'
+# class GameSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = Game
+#         fields = '__all__'
+#
+#
+# class RoundSerializer(serializers.ModelSerializer):
+#     class Meta:
+#         model = Round
+#         fields = '__all__'
 
 
 class PlayerDtoSerializer(serializers.ModelSerializer):

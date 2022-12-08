@@ -8,9 +8,6 @@ import logging
 # warnings.filterwarnings("ignore")
 os.environ['NUMEXPR_MAX_THREADS'] = '12'
 
-logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"),
-                    format='%(asctime)s - %(name)s - [%(levelname)s]: %(message)s')
-
 
 class GameEtl:
     def __init__(self, directory, demo_file, match_name, db_con_str, parse_rate=32, trade_time=5, buy_style="hltv"):

@@ -4,3 +4,6 @@ pandas~=1.5.1
 numpy~=1.23.5
 awpy~=1.1.9
 SQLAlchemy~=1.4.44
+mysql-connector-python
+django-mysql~=4.7.1
+django_mock_queries~=2.1.7
