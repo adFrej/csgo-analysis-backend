@@ -7,3 +7,7 @@ SQLAlchemy~=1.4.44
 mysql-connector-python
 django-mysql~=4.7.1
 django_mock_queries~=2.1.7
+scikit-learn~=1.2.0
+sympy~=1.11.1
+shapely~=2.0.0
+lightgbm~=3.3.3

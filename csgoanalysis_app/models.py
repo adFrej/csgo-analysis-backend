@@ -67,6 +67,10 @@ class Frame(models.Model):
     roundnum = models.PositiveSmallIntegerField(db_column='roundNum')
     tick = models.PositiveIntegerField(primary_key=True)
     clocktime = models.CharField(db_column='clockTime', max_length=5, blank=True, null=True)
+    bombplanted = Bit1BooleanField(db_column='bombPlanted', blank=True, null=True)
+    bomb_x = models.FloatField(blank=True, null=True)
+    bomb_y = models.FloatField(blank=True, null=True)
+    bomb_z = models.FloatField(blank=True, null=True)
     ctplayer_1 = models.ForeignKey('Player', models.DO_NOTHING, related_name='ct1', db_column='ctPlayer_1_ID', blank=True, null=True)
     ctplayer_1_decoygrenade = models.IntegerField(db_column='ctPlayer_1_DecoyGrenade', blank=True, null=True)
     ctplayer_1_flashbang = models.IntegerField(db_column='ctPlayer_1_Flashbang', blank=True, null=True)
@@ -457,6 +461,7 @@ class Frame(models.Model):
     tplayer_5_y = models.FloatField(db_column='tPlayer_5_y', blank=True, null=True)
     tplayer_5_z = models.FloatField(db_column='tPlayer_5_z', blank=True, null=True)
     tplayer_5_zoomlevel = models.IntegerField(db_column='tPlayer_5_zoomLevel', blank=True, null=True)
+    ctPrediction = models.FloatField(db_column='ctPrediction', blank=True, null=True)
 
     class Meta:
         managed = False
@@ -537,4 +542,103 @@ class Weaponfire(models.Model):
     class Meta:
         managed = False
         db_table = 'weaponfire'
+        unique_together = (('matchid', 'id'),)
+
+
+class Grenade(models.Model):
+    throwtick = models.PositiveIntegerField(db_column='throwTick', blank=True, null=True)
+    destroytick = models.PositiveIntegerField(db_column='destroyTick', blank=True, null=True)
+    throwseconds = models.FloatField(db_column='throwSeconds', blank=True, null=True)
+    throwclocktime = models.CharField(db_column='throwClockTime', max_length=5, blank=True, null=True)
+    destroyseconds = models.FloatField(db_column='destroySeconds', blank=True, null=True)
+    destroyclocktime = models.CharField(db_column='destroyClockTime', max_length=5, blank=True, null=True)
+    throwerid = models.PositiveIntegerField(db_column='throwerID', blank=True, null=True)
+    throwerside = models.CharField(db_column='throwerSide', max_length=2, blank=True, null=True)
+    throwerx = models.FloatField(db_column='throwerX', blank=True, null=True)
+    throwery = models.FloatField(db_column='throwerY', blank=True, null=True)
+    throwerz = models.FloatField(db_column='throwerZ', blank=True, null=True)
+    grenadetype = models.TextField(db_column='grenadeType', blank=True, null=True)
+    grenadex = models.FloatField(db_column='grenadeX', blank=True, null=True)
+    grenadey = models.FloatField(db_column='grenadeY', blank=True, null=True)
+    grenadez = models.FloatField(db_column='grenadeZ', blank=True, null=True)
+    entityid = models.CharField(db_column='entityId', max_length=19, blank=True, null=True)
+    roundnum = models.PositiveSmallIntegerField(db_column='roundNum', blank=True, null=True)
+    matchid = models.ForeignKey(Frame, models.DO_NOTHING, related_name='matchidGrenadeFK', db_column='matchID')
+    throwTick_parsed = models.PositiveIntegerField(db_column='throwTick_parsed', blank=True, null=True)
+    destroyTick_parsed = models.ForeignKey(Frame, models.DO_NOTHING, related_name='destroyTickGrenadeFK', db_column='destroyTick_parsed', blank=True, null=True)
+    id = models.PositiveSmallIntegerField(db_column='ID', primary_key=True)
+
+    class Meta:
+        managed = False
+        db_table = 'grenade'
+        unique_together = (('matchid', 'id'),)
+
+
+class Damage(models.Model):
+    tick = models.PositiveIntegerField(blank=True, null=True)
+    seconds = models.FloatField(blank=True, null=True)
+    clocktime = models.CharField(db_column='clockTime', max_length=5, blank=True, null=True)
+    attackerid = models.PositiveIntegerField(db_column='attackerID', blank=True, null=True)
+    attackerside = models.CharField(db_column='attackerSide', max_length=2, blank=True, null=True)
+    attackerx = models.FloatField(db_column='attackerX', blank=True, null=True)
+    attackery = models.FloatField(db_column='attackerY', blank=True, null=True)
+    attackerz = models.FloatField(db_column='attackerZ', blank=True, null=True)
+    attackerviewx = models.FloatField(db_column='attackerViewX', blank=True, null=True)
+    attackerviewy = models.FloatField(db_column='attackerViewY', blank=True, null=True)
+    attackerstrafe = Bit1BooleanField(db_column='attackerStrafe', blank=True, null=True)
+    victimid = models.PositiveIntegerField(db_column='victimID', blank=True, null=True)
+    victimside = models.CharField(db_column='victimSide', max_length=2, blank=True, null=True)
+    victimx = models.FloatField(db_column='victimX', blank=True, null=True)
+    victimy = models.FloatField(db_column='victimY', blank=True, null=True)
+    victimz = models.FloatField(db_column='victimZ', blank=True, null=True)
+    victimviewx = models.FloatField(db_column='victimViewX', blank=True, null=True)
+    victimviewy = models.FloatField(db_column='victimViewY', blank=True, null=True)
+    weapon = models.TextField(blank=True, null=True)
+    weaponclass = models.TextField(db_column='weaponClass', blank=True, null=True)
+    hpdamage = models.SmallIntegerField(db_column='hpDamage', blank=True, null=True)
+    hpdamagetaken = models.SmallIntegerField(db_column='hpDamageTaken', blank=True, null=True)
+    armordamage = models.SmallIntegerField(db_column='armorDamage', blank=True, null=True)
+    armordamagetaken = models.SmallIntegerField(db_column='armorDamageTaken', blank=True, null=True)
+    hitgroup = models.TextField(db_column='hitGroup', blank=True, null=True)
+    isfriendlyfire = Bit1BooleanField(db_column='isFriendlyFire', blank=True, null=True)
+    distance = models.FloatField(blank=True, null=True)
+    zoomlevel = models.IntegerField(db_column='zoomLevel', blank=True, null=True)
+    roundnum = models.PositiveSmallIntegerField(db_column='roundNum', blank=True, null=True)
+    matchid = models.ForeignKey('Frame', models.DO_NOTHING, related_name='matchidDamageFK', db_column='matchID')
+    tick_parsed = models.ForeignKey('Frame', models.DO_NOTHING, related_name='tickDamageFK', db_column='tick_parsed', blank=True, null=True)
+    id = models.PositiveIntegerField(db_column='ID', primary_key=True)
+
+    class Meta:
+        managed = False
+        db_table = 'damage'
+        unique_together = (('matchid', 'id'),)
+
+
+class Flash(models.Model):
+    tick = models.PositiveIntegerField(blank=True, null=True)
+    seconds = models.FloatField(blank=True, null=True)
+    clocktime = models.CharField(db_column='clockTime', max_length=5, blank=True, null=True)
+    attackerid = models.PositiveIntegerField(db_column='attackerID', blank=True, null=True)
+    attackerside = models.CharField(db_column='attackerSide', max_length=2, blank=True, null=True)
+    attackerx = models.FloatField(db_column='attackerX', blank=True, null=True)
+    attackery = models.FloatField(db_column='attackerY', blank=True, null=True)
+    attackerz = models.FloatField(db_column='attackerZ', blank=True, null=True)
+    attackerviewx = models.FloatField(db_column='attackerViewX', blank=True, null=True)
+    attackerviewy = models.FloatField(db_column='attackerViewY', blank=True, null=True)
+    playerid = models.PositiveIntegerField(db_column='playerID', blank=True, null=True)
+    playerside = models.CharField(db_column='playerSide', max_length=2, blank=True, null=True)
+    playerx = models.FloatField(db_column='playerX', blank=True, null=True)
+    playery = models.FloatField(db_column='playerY', blank=True, null=True)
+    playerz = models.FloatField(db_column='playerZ', blank=True, null=True)
+    playerviewx = models.FloatField(db_column='playerViewX', blank=True, null=True)
+    playerviewy = models.FloatField(db_column='playerViewY', blank=True, null=True)
+    flashduration = models.FloatField(db_column='flashDuration', blank=True, null=True)
+    roundnum = models.PositiveSmallIntegerField(db_column='roundNum', blank=True, null=True)
+    tick_parsed = models.ForeignKey('Frame', models.DO_NOTHING, related_name='tickFlashFK', db_column='tick_parsed', blank=True, null=True)
+    matchid = models.ForeignKey('Frame', models.DO_NOTHING, related_name='matchidFlashFK', db_column='matchID')
+    id = models.PositiveSmallIntegerField(db_column='ID', primary_key=True)
+
+    class Meta:
+        managed = False
+        db_table = 'flash'
         unique_together = (('matchid', 'id'),)

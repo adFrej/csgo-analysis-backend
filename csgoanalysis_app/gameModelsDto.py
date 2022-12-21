@@ -10,16 +10,35 @@ class PlayerDto(models.Model):
     kills = models.IntegerField()
     assists = models.IntegerField()
     deaths = models.IntegerField()
+    kd = models.FloatField()
+    killsPerRound = models.FloatField()
+    damage = models.IntegerField()
+    adr = models.FloatField()
+    kast = models.FloatField()
+    flashedEnemies = models.IntegerField()
+    flashedEnemiesDuration = models.FloatField()
 
     @staticmethod
-    def create(player, game_id):
+    def create(player, game_id, n_rounds, kills, damages, flashes):
         log.debug(f"Creating game player with id: {player.id} and name: {player.name}")
-        elimination = Elimination.objects
         player_dto = PlayerDto()
         player_dto.name = player.name
-        player_dto.kills = elimination.filter(matchid_id=game_id, attackerid=player.id).count()
-        player_dto.assists = elimination.filter(matchid_id=game_id, assisterid=player.id).count()
-        player_dto.deaths = elimination.filter(matchid_id=game_id, victimid=player.id).count()
+        player_dto.kills = kills.filter(attackerid=player.id).count()
+        player_dto.assists = kills.filter(assisterid=player.id).count()
+        player_dto.deaths = Elimination.objects.filter(matchid_id=game_id, victimid=player.id).count()
+        player_dto.kd = player_dto.kills / player_dto.deaths
+        player_dto.killsPerRound = player_dto.kills / n_rounds
+        player_dto.damage = damages.filter(attackerid=player.id).get()['sumDmg']
+        player_dto.adr = player_dto.damage / n_rounds
+        rounds_kill = list(kills.filter(attackerid=player.id).values_list('roundnum', flat=True))
+        rounds_assist = list(kills.filter(assisterid=player.id).values_list('roundnum', flat=True))
+        rounds_deaths = list(Elimination.objects.filter(matchid_id=game_id, victimid=player.id).values_list('roundnum', flat=True))
+        rounds_traded = list(kills.filter(victimid=player.id, istrade=True).values_list('roundnum', flat=True))
+        rounds_kast = [r for r in range(1, n_rounds+1) if r not in rounds_deaths or r in rounds_kill or r in rounds_assist or r in rounds_traded]
+        player_dto.kast = len(rounds_kast) / n_rounds * 100
+        flash = flashes.filter(attackerid=player.id).get()
+        player_dto.flashedEnemies = flash['countFlash']
+        player_dto.flashedEnemiesDuration = flash['sumDuration']
         return player_dto
 
     class Meta:
@@ -31,12 +50,13 @@ class TeamDto(models.Model):
     players = []
 
     @staticmethod
-    def create(team_name, game_id, player_types):
+    def create(team_name, game_id, n_rounds, player_types, kills, damages, flashes):
         frame = Frame.objects.filter(matchid_id=game_id)
         team_dto = TeamDto()
         team_dto.name = team_name
         team_dto.players = [PlayerDto.create(frame.select_related(player_type).first().
-                            __getattribute__(player_type), game_id) for player_type in player_types]
+                            __getattribute__(player_type), game_id, n_rounds, kills, damages, flashes)
+                            for player_type in player_types]
         return team_dto
 
     class Meta:
@@ -48,12 +68,17 @@ class TeamsDto(models.Model):
     lastCTSide = TeamDto()
 
     @staticmethod
-    def create(rounds, game_id):
+    def create(rounds, game_id, n_rounds):
         teams_dto = TeamsDto()
+        damages = Damage.objects.filter(matchid_id=game_id, isfriendlyfire=False).values('attackerid')\
+            .order_by('attackerid').annotate(sumDmg=models.Sum('hpdamagetaken'))
+        kills = Elimination.objects.filter(matchid_id=game_id, isteamkill=False)
+        flashes = Flash.objects.filter(matchid_id=game_id).values('attackerid').order_by('attackerid')\
+            .annotate(countFlash=models.Count('attackerid'), sumDuration=models.Sum('flashduration'))
         teams_dto.lastCTSide = TeamDto.create(rounds.order_by('roundnum').first().tteam,
-                                             game_id, ['tplayer_'+str(i+1) for i in range(5)])
+                                              game_id, n_rounds, ['tplayer_'+str(i+1) for i in range(5)], kills, damages, flashes)
         teams_dto.lastTSide = TeamDto.create(rounds.order_by('roundnum').first().ctteam,
-                                              game_id, ['ctplayer_'+str(i+1) for i in range(5)])
+                                             game_id, n_rounds, ['ctplayer_'+str(i+1) for i in range(5)], kills, damages, flashes)
         return teams_dto
 
     class Meta:
@@ -72,7 +97,7 @@ class GameDto(models.Model):
         game_dto = GameDto()
         game_dto.map = game.mapname
         game_dto.roundsPlayed = rounds.count()
-        game_dto.teams = TeamsDto.create(rounds, game.id)
+        game_dto.teams = TeamsDto.create(rounds, game.id, game_dto.roundsPlayed)
         return game_dto
 
     class Meta:

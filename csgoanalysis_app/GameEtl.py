@@ -4,8 +4,9 @@ import numpy as np
 import os
 from sqlalchemy import create_engine
 import logging
-# import warnings
-# warnings.filterwarnings("ignore")
+
+from .AnalyticModule import AnalyticModule
+
 os.environ['NUMEXPR_MAX_THREADS'] = '12'
 
 
@@ -40,7 +41,7 @@ class GameEtl:
         )
         self.df_demo = demo_parser.parse(return_type="df")
         self.parsed_demo = demo_parser.json
-        self.log.debug(f"Removing demo json file: \"{self.demo_file[:-4]}\".json")
+        self.log.debug(f"Removing demo json file: \"{self.demo_file[:-4]}.json\"")
         os.remove(self.demo_file[:-4] + ".json")
 
     def make_tables(self):
@@ -49,17 +50,16 @@ class GameEtl:
         self.match_id = self.get_match_id()
         self.players_df = self.get_player_data()
         self.player_id_mapping = self.get_player_mapping()
+        self.rounds = self.get_rounds(self.df_demo["rounds"])
         self.match_df = self.get_match_data()
         self.player_name_mapping = self.get_player_name_mapping()
         self.kills = self.get_kills(self.df_demo["kills"],
                                     ["attacker", "victim", "assister", "flashThrower", "playerTraded"])
         self.damages = self.get_damages(self.df_demo["damages"], ["attacker", "victim"])
-        self.grenades = self.get_dataframe(self.df_demo["grenades"].rename(columns={"throwTick": "tick"}), ["thrower"]
-                                           ).rename(columns={"tick": "throwTick"})
+        self.grenades = self.get_grenades(self.df_demo["grenades"], ["thrower"])
         self.flashes = self.get_dataframe(self.df_demo["flashes"], ["attacker", "player"]).drop("matchId", axis=1)
         self.weaponFires = self.get_dataframe(self.df_demo["weaponFires"], ["player"])
         self.bombEvents = self.get_dataframe(self.df_demo["bombEvents"], ["player"]).drop("ID", axis=1)
-        self.rounds = self.get_rounds(self.df_demo["rounds"])
 
     def save_to_db(self):
         self.log.info("Saving all tables to database")
@@ -159,8 +159,8 @@ class GameEtl:
 
         return map_steam_id
 
-    def get_match_data(self):
-        self.log.debug("Creating frame table")
+    def get_match_data(self, with_pred=True):
+        self.log.debug(f"Creating frame table with predictions: {with_pred}")
         data = self.parsed_demo
         data_list = []
         mapping = self.create_mapping(data['gameRounds'][0])
@@ -182,6 +182,17 @@ class GameEtl:
                 res[col] = res[col].astype('str')
         res["matchID"] = self.match_id
         res = res.sort_index(axis=1)
+        res = res.reset_index(drop=True)
+
+        if with_pred:
+            states = res.copy()
+            states["mapName"] = self.match_info["mapName"][0]
+            states = states.merge(self.rounds[["matchID", "roundNum", "endTickCorrect"]], how="left", on=["matchID", "roundNum"])
+            states = states[states["tick"] < states["endTickCorrect"]].drop(columns=["endTickCorrect"])
+            am = AnalyticModule("model.pkl")
+            states["ctPrediction"] = am.get_predictions(states)
+            res = res.merge(states[["tick", "ctPrediction"]], how="left", on="tick")
+
         for col in res.columns:
             if res[col].dtypes == "bool":
                 res[col] = res[col].replace({False: "", True: "1"})
@@ -227,22 +238,16 @@ class GameEtl:
                                       df_demo['tickRate'], df_demo['playbackTicks'], self.parse_rate])), index=[0])
 
     def get_match_id_from_db(self):
-        match_info = self.match_info
-        return pd.read_sql(sql=f'SELECT ID FROM game WHERE demoName = \"{match_info["demoName"][0]}\" AND '
-                               f'matchName = \"{match_info["matchName"][0]}\" AND '
-                               f'clientName = \"{match_info["clientName"][0]}\" AND '
-                               f'parseRate = \"{match_info["parseRate"][0]}\"', con=self.db_con)
+        return pd.read_sql(sql=f'SELECT max(ID) FROM game', con=self.db_con)
 
     def get_match_id(self):
         self.log.debug("Getting game id")
-        match_id = self.get_match_id_from_db()
-        if match_id.empty:
-            self.match_info.to_sql(name="game", con=self.db_con, if_exists="append", index=False)
-            match_id = self.get_match_id_from_db()
-        self.log.debug(f"Game id is {match_id.iloc[0, 0]}")
-        return match_id.iloc[0, 0]
+        self.match_info.to_sql(name="game", con=self.db_con, if_exists="append", index=False)
+        match_id = self.get_match_id_from_db().iloc[0, 0]
+        self.log.debug(f"Game id is {match_id}")
+        return match_id
 
-    def get_dataframe(self, df, player_types):
+    def get_dataframe(self, df, player_types, tick_flag=True):
         self.log.debug("Creating basic table")
         ticks = self.match_df["tick"]
         df = df.drop("mapName", axis=1)
@@ -254,7 +259,8 @@ class GameEtl:
             df = df.replace({player + "SteamID": self.player_id_mapping}) \
                 .rename(columns={player + "SteamID": player + "ID"})
             df[player + "ID"] = df[player + "ID"].astype("Int64")
-        df["tick_parsed"] = df["tick"].apply(lambda x: ticks[np.argmin(np.abs(ticks - x))])
+        if tick_flag:
+            df["tick_parsed"] = df["tick"].apply(lambda x: np.max(ticks[ticks <= x])).fillna(np.min(ticks))
         df["matchID"] = self.match_id
         df["ID"] = range(1, df.shape[0] + 1)
         return df
@@ -272,6 +278,14 @@ class GameEtl:
         df["attackerSteamID"] = df["attackerName"]
         df["zoomLevel"] = df["zoomLevel"].fillna(0).astype("Int64")
         return self.get_dataframe(df, player_types)
+
+    def get_grenades(self, df, player_types):
+        self.log.debug("Creating grenade table")
+        ticks = self.match_df["tick"]
+        df["throwTick_parsed"] = df["throwTick"].apply(lambda x: np.max(ticks[ticks <= x])).fillna(np.min(ticks))
+        df["destroyTick_parsed"] = df["destroyTick"].apply(lambda x: np.max(ticks) if x == 0 else np.max(ticks[ticks <= x])).fillna(
+            np.min(ticks))
+        return self.get_dataframe(df, player_types, False)
 
     def get_rounds(self, df):
         self.log.debug("Creating round table")

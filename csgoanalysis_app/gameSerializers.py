@@ -1,24 +1,11 @@
 from rest_framework import serializers
-from .models import *
 from .gameModelsDto import *
-
-
-# class GameSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = Game
-#         fields = '__all__'
-#
-#
-# class RoundSerializer(serializers.ModelSerializer):
-#     class Meta:
-#         model = Round
-#         fields = '__all__'
 
 
 class PlayerDtoSerializer(serializers.ModelSerializer):
     class Meta:
         model = PlayerDto
-        fields = ['name', 'kills', 'assists', 'deaths']
+        fields = ['name', 'kills', 'assists', 'deaths', 'kd', 'killsPerRound', 'damage', 'adr', 'kast', 'flashedEnemies', 'flashedEnemiesDuration']
 
 
 class TeamDtoSerializer(serializers.ModelSerializer):

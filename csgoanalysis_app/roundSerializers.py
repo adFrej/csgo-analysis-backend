@@ -7,7 +7,7 @@ class RoundPlayerDtoSerializer(serializers.ModelSerializer):
     class Meta:
         model = RoundPlayerDto
         fields = ['id', 'name', 'team', 'equipmentvaluefreezetimeend', 'fires', 'hasarmor', 'hasdefuse', 'hashelmet',
-                  'hp', 'isblinded', 'mainweapon', 'viewx', 'x', 'y']
+                  'hp', 'isblinded', 'mainweapon', 'a', 'x', 'y', 'radarSlice']
         # fields = ['id', 'name', 'team', 'decoygrenade', 'flashbang', 'hegrenade', 'smokegrenade', 'activeweapon',
         #           'equipmentvaluefreezetimeend', 'eyex', 'eyey', 'eyez', 'firegrenades', 'hasarmor', 'hasbomb',
         #           'hasdefuse', 'hashelmet', 'hp', 'isairborne', 'isalive', 'isblinded', 'isbot', 'isdefusing',
@@ -16,12 +16,32 @@ class RoundPlayerDtoSerializer(serializers.ModelSerializer):
         #           'x', 'y', 'z', 'zoomlevel']
 
 
+class RoundBombDtoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RoundBombDto
+        fields = ['x', 'y', 'state', 'radarSlice']
+
+
+class RoundGrenadeDtoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = RoundGrenadeDto
+        fields = ['x', 'y', 'type', 'start', 'end', 'radarSlice']
+
+
 class RoundDtoSerializer(serializers.ModelSerializer):
     players = serializers.SerializerMethodField()
+    bomb = serializers.SerializerMethodField()
+    grenades = serializers.SerializerMethodField()
 
     class Meta:
         model = RoundDto
-        fields = ['roundNumber', 'tName', 'ctName', 'tScore', 'ctScore', 'length', 'clockTime', 'CTpredictions', 'players']
+        fields = ['roundNumber', 'tName', 'ctName', 'tScore', 'ctScore', 'length', 'clockTime', 'CTpredictions', 'players', 'bomb', 'grenades']
 
     def get_players(self, instance):
         return RoundPlayerDtoSerializer(instance.players, many=True).data
+
+    def get_bomb(self, instance):
+        return RoundBombDtoSerializer(instance.bomb).data
+
+    def get_grenades(self, instance):
+        return RoundGrenadeDtoSerializer(instance.grenades, many=True).data
