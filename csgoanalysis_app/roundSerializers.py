@@ -6,8 +6,8 @@ from .roundModelsDto import *
 class RoundPlayerDtoSerializer(serializers.ModelSerializer):
     class Meta:
         model = RoundPlayerDto
-        fields = ['id', 'name', 'team', 'equipmentvaluefreezetimeend', 'fires', 'hasarmor', 'hasdefuse', 'hashelmet',
-                  'hp', 'isblinded', 'mainweapon', 'a', 'x', 'y', 'radarSlice']
+        fields = ['id', 'name', 'team', 'equipmentValueFreezetimeEnd', 'fires', 'hasArmor', 'hasDef', 'hasHelmet',
+                  'hp', 'isBlinded', 'mainWeapon', 'a', 'x', 'y', 'radarSlice']
         # fields = ['id', 'name', 'team', 'decoygrenade', 'flashbang', 'hegrenade', 'smokegrenade', 'activeweapon',
         #           'equipmentvaluefreezetimeend', 'eyex', 'eyey', 'eyez', 'firegrenades', 'hasarmor', 'hasbomb',
         #           'hasdefuse', 'hashelmet', 'hp', 'isairborne', 'isalive', 'isblinded', 'isbot', 'isdefusing',
@@ -35,7 +35,7 @@ class RoundDtoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = RoundDto
-        fields = ['roundNumber', 'tName', 'ctName', 'tScore', 'ctScore', 'length', 'clockTime', 'CTpredictions', 'players', 'bomb', 'grenades']
+        fields = ['roundNumber', 'winningSide', 'tName', 'ctName', 'tScore', 'ctScore', 'length', 'end', 'clockTime', 'CTpredictions', 'players', 'bomb', 'grenades']
 
     def get_players(self, instance):
         return RoundPlayerDtoSerializer(instance.players, many=True).data

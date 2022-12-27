@@ -86,7 +86,7 @@ class GameEtl:
     def save_to_db_table(self, df, name):
         self.log.debug(f"Saving {name} table to database")
         with self.db_con.connect() as connection:
-            connection.execute("SET FOREIGN_KEY_CHECKS = 0;")
+            # connection.execute("SET FOREIGN_KEY_CHECKS = 0;")
             df.to_sql(name=name, con=connection, if_exists="append", index=False)
 
     def get_team_data(self, frame, team, mapping):
@@ -187,11 +187,14 @@ class GameEtl:
         if with_pred:
             states = res.copy()
             states["mapName"] = self.match_info["mapName"][0]
-            states = states.merge(self.rounds[["matchID", "roundNum", "endTickCorrect"]], how="left", on=["matchID", "roundNum"])
+            states = states.merge(self.rounds[["matchID", "roundNum", "endTickCorrect", "winningSide"]], how="left", on=["matchID", "roundNum"])
+            win = states[["winningSide"]]
+            win = pd.DataFrame(np.where(win == "CT", 1, 0), columns=["ctPrediction"])
             states = states[states["tick"] < states["endTickCorrect"]].drop(columns=["endTickCorrect"])
             am = AnalyticModule("model.pkl")
             states["ctPrediction"] = am.get_predictions(states)
             res = res.merge(states[["tick", "ctPrediction"]], how="left", on="tick")
+            res[["ctPrediction"]] = res[["ctPrediction"]].fillna(win)
 
         for col in res.columns:
             if res[col].dtypes == "bool":

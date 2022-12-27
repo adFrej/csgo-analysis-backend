@@ -26,9 +26,12 @@ class PlayerDto(models.Model):
         player_dto.kills = kills.filter(attackerid=player.id).count()
         player_dto.assists = kills.filter(assisterid=player.id).count()
         player_dto.deaths = Elimination.objects.filter(matchid_id=game_id, victimid=player.id).count()
-        player_dto.kd = player_dto.kills / player_dto.deaths
+        player_dto.kd = player_dto.kills / (player_dto.deaths if player_dto.deaths != 0 else 1)
         player_dto.killsPerRound = player_dto.kills / n_rounds
-        player_dto.damage = damages.filter(attackerid=player.id).get()['sumDmg']
+        try:
+            player_dto.damage = damages.filter(attackerid=player.id).get()['sumDmg']
+        except models.ObjectDoesNotExist:
+            player_dto.damage = 0
         player_dto.adr = player_dto.damage / n_rounds
         rounds_kill = list(kills.filter(attackerid=player.id).values_list('roundnum', flat=True))
         rounds_assist = list(kills.filter(assisterid=player.id).values_list('roundnum', flat=True))
@@ -36,7 +39,10 @@ class PlayerDto(models.Model):
         rounds_traded = list(kills.filter(victimid=player.id, istrade=True).values_list('roundnum', flat=True))
         rounds_kast = [r for r in range(1, n_rounds+1) if r not in rounds_deaths or r in rounds_kill or r in rounds_assist or r in rounds_traded]
         player_dto.kast = len(rounds_kast) / n_rounds * 100
-        flash = flashes.filter(attackerid=player.id).get()
+        try:
+            flash = flashes.filter(attackerid=player.id).get()
+        except models.ObjectDoesNotExist:
+            flash = {'countFlash': 0, 'sumDuration': 0.0}
         player_dto.flashedEnemies = flash['countFlash']
         player_dto.flashedEnemiesDuration = flash['sumDuration']
         return player_dto
@@ -86,6 +92,8 @@ class TeamsDto(models.Model):
 
 
 class GameDto(models.Model):
+    id = models.PositiveSmallIntegerField(primary_key=True)
+    name = models.TextField()
     map = models.TextField()
     roundsPlayed = models.PositiveSmallIntegerField()
     teams = TeamsDto()
@@ -95,9 +103,27 @@ class GameDto(models.Model):
         log.info(f"Creating game with id: {game.id}")
         rounds = Round.objects.filter(matchid_id=game.id)
         game_dto = GameDto()
+        game_dto.id = game.id
+        game_dto.name = game.matchname
         game_dto.map = game.mapname
         game_dto.roundsPlayed = rounds.count()
         game_dto.teams = TeamsDto.create(rounds, game.id, game_dto.roundsPlayed)
+        return game_dto
+
+    class Meta:
+        managed = False
+
+
+class GameSmallDto(models.Model):
+    id = models.PositiveSmallIntegerField(primary_key=True)
+    name = models.TextField()
+
+    @staticmethod
+    def from_game(game):
+        log.debug(f"Creating small game with id: {game.id}")
+        game_dto = GameSmallDto()
+        game_dto.id = game.id
+        game_dto.name = game.matchname
         return game_dto
 
     class Meta:

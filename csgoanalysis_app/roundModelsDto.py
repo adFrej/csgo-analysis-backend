@@ -28,21 +28,20 @@ class RoundPlayerDto(models.Model):
     # smokegrenade = []
     # activeweapon = []
     # armor = []
-    equipmentvaluefreezetimeend = models.PositiveSmallIntegerField()
-    # equipmentvaluefreezetimeend = []
+    equipmentValueFreezetimeEnd = models.PositiveSmallIntegerField()
     # eyex = []
     # eyey = []
     # eyez = []
     # firegrenades = []
     fires = []
-    hasarmor = Bit1BooleanField()
+    hasArmor = Bit1BooleanField()
     # hasbomb = []
-    hasdefuse = []
-    hashelmet = Bit1BooleanField()
+    hasDef = []
+    hasHelmet = Bit1BooleanField()
     hp = []
     # isairborne = []
     # isalive = []
-    isblinded = []
+    isBlinded = []
     # isbot = []
     # isdefusing = []
     # isducking = []
@@ -51,7 +50,7 @@ class RoundPlayerDto(models.Model):
     # isreloading = []
     # isscoped = []
     # isunduckinginprogress = []
-    mainweapon = []
+    mainWeapon = []
     # ping = []
     # secondaryweapon = []
     # velocityx = []
@@ -78,8 +77,7 @@ class RoundPlayerDto(models.Model):
         # player_dto.smokegrenade = list(frame.values_list(player_type + '_smokegrenade', flat=True))
         # player_dto.activeweapon = list(frame.values_list(player_type + '_activeweapon', flat=True))
         # player_dto.armor = list(frame.values_list(player_type + '_armor', flat=True)) # not used
-        player_dto.equipmentvaluefreezetimeend = next(iter(frame.values(player_type + '_equipmentvaluefreezetimeend').first().values()))
-        # player_dto.equipmentvaluefreezetimeend = list(frame.values_list(player_type + '_equipmentvaluefreezetimeend', flat=True))
+        player_dto.equipmentValueFreezetimeEnd = next(iter(frame.values(player_type + '_equipmentvaluefreezetimeend').first().values()))
         # player_dto.eyex = list(frame.values_list(player_type + '_eyex', flat=True))
         # player_dto.eyey = list(frame.values_list(player_type + '_eyey', flat=True))
         # player_dto.eyez = list(frame.values_list(player_type + '_eyez', flat=True))
@@ -87,14 +85,14 @@ class RoundPlayerDto(models.Model):
         ticks = list(frame.values_list('tick', flat=True))
         ticks_fire = list(Weaponfire.objects.filter(matchid_id=round_.matchid_id, roundnum=round_.roundnum, playerid=player.id).values_list("tick_parsed_id", flat=True))
         player_dto.fires = [tick in ticks_fire for tick in ticks]
-        player_dto.hasarmor = any([x >= 15 for x in list(frame.values_list(player_type + '_armor', flat=True))])
+        player_dto.hasArmor = any([x >= 15 for x in list(frame.values_list(player_type + '_armor', flat=True))])
         # player_dto.hasbomb = list(frame.values_list(player_type + '_hasbomb', flat=True))
-        player_dto.hasdefuse = list(frame.values_list(player_type + '_hasdefuse', flat=True))
-        player_dto.hashelmet = any(list(frame.values_list(player_type + '_hashelmet', flat=True)))
+        player_dto.hasDef = list(frame.values_list(player_type + '_hasdefuse', flat=True))
+        player_dto.hasHelmet = any(list(frame.values_list(player_type + '_hashelmet', flat=True)))
         player_dto.hp = list(frame.values_list(player_type + '_hp', flat=True))
         # player_dto.isairborne = list(frame.values_list(player_type + '_isairborne', flat=True))
         # player_dto.isalive = list(frame.values_list(player_type + '_isalive', flat=True))
-        player_dto.isblinded = list(frame.values_list(player_type + '_isblinded', flat=True))
+        player_dto.isBlinded = list(frame.values_list(player_type + '_isblinded', flat=True))
         # player_dto.isbot = list(frame.values_list(player_type + '_isbot', flat=True))
         # player_dto.isdefusing = list(frame.values_list(player_type + '_isdefusing', flat=True))
         # player_dto.isducking = list(frame.values_list(player_type + '_isducking', flat=True))
@@ -103,7 +101,7 @@ class RoundPlayerDto(models.Model):
         # player_dto.isreloading = list(frame.values_list(player_type + '_isreloading', flat=True))
         # player_dto.isscoped = list(frame.values_list(player_type + '_isscoped', flat=True))
         # player_dto.isunduckinginprogress = list(frame.values_list(player_type + '_isunduckinginprogress', flat=True))
-        player_dto.mainweapon = list(frame.values_list(player_type + '_mainweapon', flat=True))
+        player_dto.mainWeapon = list(frame.values_list(player_type + '_mainweapon', flat=True))
         # player_dto.ping = list(frame.values_list(player_type + '_ping', flat=True))
         # player_dto.secondaryweapon = list(frame.values_list(player_type + '_secondaryweapon', flat=True))
         # player_dto.velocityx = list(frame.values_list(player_type + '_velocityx', flat=True))
@@ -126,12 +124,16 @@ class RoundBombDto(models.Model):
     radarSlice = []
 
     @staticmethod
-    def create(frame, map_name):
+    def create(frame, map_name, end, end_reason):
         log.debug(f"Creating round bomb")
         round_bomb_dto = RoundBombDto()
         round_bomb_dto.x = list(frame.values_list('bomb_x', flat=True))
         round_bomb_dto.y = list(frame.values_list('bomb_y', flat=True))
-        round_bomb_dto.state = list(frame.values_list('bombplanted', flat=True))
+        round_bomb_dto.state = [int(s) for s in list(frame.values_list('bombplanted', flat=True))]
+        if end_reason == "BombDefused":
+            round_bomb_dto.state[end:] = [2]*(len(round_bomb_dto.state)-end)
+        elif end_reason == "TargetBombed":
+            round_bomb_dto.state[end:] = [3]*(len(round_bomb_dto.state)-end)
         round_bomb_dto.radarSlice = [get_radar_slice(z, map_name) for z in list(frame.values_list('bomb_z', flat=True))]
         return round_bomb_dto
 
@@ -160,11 +162,13 @@ class RoundGrenadeDto(models.Model):
 
 class RoundDto(models.Model):
     roundNumber = models.PositiveSmallIntegerField()
+    winningSide = models.TextField()
     tName = models.TextField()
     ctName = models.TextField()
     tScore = models.PositiveSmallIntegerField()
     ctScore = models.PositiveSmallIntegerField()
     length = models.IntegerField()
+    end = models.IntegerField()
     clockTime = []
     CTpredictions = []
     players = [None] * 10
@@ -176,12 +180,14 @@ class RoundDto(models.Model):
         log.info(f"Creating round with number: {round_.roundnum}")
         round_dto = RoundDto()
         round_dto.roundNumber = round_.roundnum
+        round_dto.winningSide = round_.winningside
         round_dto.tName = round_.tteam
         round_dto.ctName = round_.ctteam
         round_dto.tScore = round_.tscore
         round_dto.ctScore = round_.ctscore
         frame = Frame.objects.filter(matchid_id=round_.matchid_id, roundnum=round_.roundnum)
         round_dto.length = frame.count()
+        round_dto.end = frame.filter(tick__lte=round_.endtickcorrect).count()
         round_dto.clockTime = list(frame.values_list('clocktime', flat=True))
         round_dto.CTpredictions = list(frame.values_list('ctPrediction', flat=True))
         game = Game.objects.filter(id=round_.matchid_id).get()
@@ -191,11 +197,12 @@ class RoundDto(models.Model):
         for i, (player_type, id_) in enumerate(player_types):
             round_dto.players[i] = RoundPlayerDto.create(
                 frame, player_type, frame.select_related(player_type).first().__getattribute__(player_type), id_, round_, map_name)
-                # frame[:5], player_type, frame.select_related(player_type).first().__getattribute__(player_type), id_)
-        round_dto.bomb = RoundBombDto.create(frame, map_name)
+        round_dto.bomb = RoundBombDto.create(frame, map_name, round_dto.end, round_.roundendreason)
         start_tick = frame.first().tick
+        grenades = []
         for grenade in Grenade.objects.filter(matchid_id=round_.matchid_id, roundnum=round_.roundnum):
-            round_dto.grenades.append(RoundGrenadeDto.create(grenade, start_tick, tick_rate, parse_rate, map_name))
+            grenades.append(RoundGrenadeDto.create(grenade, start_tick, tick_rate, parse_rate, map_name))
+        round_dto.grenades = grenades
         return round_dto
 
     class Meta:

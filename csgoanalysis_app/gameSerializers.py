@@ -41,10 +41,16 @@ class GameDtoSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = GameDto
-        fields = ['map', 'roundsPlayed', 'teams']
+        fields = ['id', 'name', 'map', 'roundsPlayed', 'teams']
 
     def create(self, validated_data):
         game = GameDto.objects.create(**validated_data)
         teams_data = validated_data.pop('teams')
         TeamsDto.objects.create(game=game, **teams_data)
         return game
+
+
+class GameSmallDtoSerializer(serializers.ModelSerializer):
+    class Meta:
+        model = GameDto
+        fields = ['id', 'name']

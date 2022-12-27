@@ -25,8 +25,8 @@ def hello(request):
 def get_games(request):
     log.info("Getting all games")
     games = Game.objects.all()
-    games = [GameDto.from_game(game) for game in games]
-    return Response(GameDtoSerializer(games, many=True).data, status=status.HTTP_200_OK)
+    games = [GameSmallDto.from_game(game) for game in games]
+    return Response(GameSmallDtoSerializer(games, many=True).data, status=status.HTTP_200_OK)
 
 
 @api_view(['GET'])
@@ -70,7 +70,7 @@ def upload_file(request, name="standard"):
     file_obj = request.FILES["file"]
     if not file_obj.name.endswith(".dem"):
         return Response("Only .dem files accepted.", status=status.HTTP_415_UNSUPPORTED_MEDIA_TYPE)
-    log.info(f"Uploading dem file: \"{file_obj.name}\"")
+    log.info(f"Uploading dem file: \"{file_obj.name}\" with given name: \"{name}\"")
     db_con_str = r"mysql+mysqlconnector://" + settings.DATABASES['default']['USER'] + r":" + \
                  settings.DATABASES['default']['PASSWORD'] + r"@" + settings.DATABASES['default']['HOST'] + r"/" + \
                  settings.DATABASES['default']['NAME'] + r"?allow_local_infile=1"
