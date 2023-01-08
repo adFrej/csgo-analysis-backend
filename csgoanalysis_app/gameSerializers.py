@@ -5,7 +5,8 @@ from .gameModelsDto import *
 class PlayerDtoSerializer(serializers.ModelSerializer):
     class Meta:
         model = PlayerDto
-        fields = ['name', 'kills', 'assists', 'deaths', 'kd', 'killsPerRound', 'damage', 'adr', 'kast', 'flashedEnemies', 'flashedEnemiesDuration']
+        fields = ['name', 'kills', 'assists', 'deaths', 'kd', 'killsPerRound', 'damage', 'adr', 'kast',
+                  'flashedEnemies', 'flashedEnemiesDuration', 'rating']
 
 
 class TeamDtoSerializer(serializers.ModelSerializer):

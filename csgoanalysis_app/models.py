@@ -11,6 +11,7 @@ class Game(models.Model):
     tickrate = models.PositiveIntegerField(db_column='tickRate', blank=True, null=True)
     playbackticks = models.PositiveIntegerField(db_column='playbackTicks', blank=True, null=True)
     parserate = models.PositiveIntegerField(db_column='parseRate', blank=True, null=True)
+    valid = Bit1BooleanField(blank=True, null=True)
     createdtimestamp = models.DateTimeField(db_column='createdTimestamp', blank=True, null=True)
 
     class Meta:
@@ -461,6 +462,7 @@ class Frame(models.Model):
     tplayer_5_y = models.FloatField(db_column='tPlayer_5_y', blank=True, null=True)
     tplayer_5_z = models.FloatField(db_column='tPlayer_5_z', blank=True, null=True)
     tplayer_5_zoomlevel = models.IntegerField(db_column='tPlayer_5_zoomLevel', blank=True, null=True)
+    importantmoment = Bit1BooleanField(db_column='importantMoment', blank=True, null=True)
     ctPrediction = models.FloatField(db_column='ctPrediction', blank=True, null=True)
 
     class Meta:
@@ -641,4 +643,19 @@ class Flash(models.Model):
     class Meta:
         managed = False
         db_table = 'flash'
+        unique_together = (('matchid', 'id'),)
+
+
+class Rating(models.Model):
+    roundnum = models.PositiveSmallIntegerField(db_column='roundNum', blank=True, null=True)
+    tick = models.ForeignKey('Frame', models.DO_NOTHING, related_name='tickRatingFK', db_column='tick', blank=True, null=True)
+    playerid = models.PositiveIntegerField(db_column='playerID', blank=True, null=True)
+    gainvalue = models.FloatField(db_column='gainValue', blank=True, null=True)
+    type = models.TextField(blank=True, null=True)
+    matchid = models.ForeignKey('Frame', models.DO_NOTHING, related_name='matchidRatingFK', db_column='matchID')
+    id = models.PositiveSmallIntegerField(db_column='ID', primary_key=True)
+
+    class Meta:
+        managed = False
+        db_table = 'rating'
         unique_together = (('matchid', 'id'),)

@@ -25,8 +25,12 @@ class GameEtl:
         self.log.info(f"Openning connection to database: \"{self.db_con_str}\"")
         self.db_con = create_engine(self.db_con_str)
         self.parse()
-        self.make_tables()
-        self.save_to_db()
+        try:
+            self.make_tables()
+            self.save_to_db()
+        except Exception as e:
+            self.invalidate_match()
+            raise Exception(e)
         self.db_con.dispose()
         return int(self.match_id)
 
@@ -60,6 +64,7 @@ class GameEtl:
         self.flashes = self.get_dataframe(self.df_demo["flashes"], ["attacker", "player"]).drop("matchId", axis=1)
         self.weaponFires = self.get_dataframe(self.df_demo["weaponFires"], ["player"])
         self.bombEvents = self.get_dataframe(self.df_demo["bombEvents"], ["player"]).drop("ID", axis=1)
+        self.ratings = self.get_ratings()
 
     def save_to_db(self):
         self.log.info("Saving all tables to database")
@@ -71,9 +76,13 @@ class GameEtl:
         self.save_to_db_table(self.flashes, "flash")
         self.save_to_db_table(self.weaponFires, "weaponfire")
         self.save_to_db_table(self.bombEvents, "bombevent")
+        self.save_to_db_table(self.ratings, "rating")
 
     def save_to_db_frame(self):
         self.log.debug(f"Saving frame table to database")
+        for col in self.match_df.columns:
+            if self.match_df[col].dtypes == "bool":
+                self.match_df[col] = self.match_df[col].replace({False: "", True: "1"})
         self.match_df.to_csv(os.path.join(self.directory, "frame.csv"), sep=";", encoding='utf-8',
                              index=False, header=False)
         with self.db_con.begin() as connection:
@@ -86,7 +95,6 @@ class GameEtl:
     def save_to_db_table(self, df, name):
         self.log.debug(f"Saving {name} table to database")
         with self.db_con.connect() as connection:
-            # connection.execute("SET FOREIGN_KEY_CHECKS = 0;")
             df.to_sql(name=name, con=connection, if_exists="append", index=False)
 
     def get_team_data(self, frame, team, mapping):
@@ -159,8 +167,8 @@ class GameEtl:
 
         return map_steam_id
 
-    def get_match_data(self, with_pred=True):
-        self.log.debug(f"Creating frame table with predictions: {with_pred}")
+    def get_match_data(self):
+        self.log.debug(f"Creating frame table")
         data = self.parsed_demo
         data_list = []
         mapping = self.create_mapping(data['gameRounds'][0])
@@ -183,23 +191,28 @@ class GameEtl:
         res["matchID"] = self.match_id
         res = res.sort_index(axis=1)
         res = res.reset_index(drop=True)
-
-        if with_pred:
-            states = res.copy()
-            states["mapName"] = self.match_info["mapName"][0]
-            states = states.merge(self.rounds[["matchID", "roundNum", "endTickCorrect", "winningSide"]], how="left", on=["matchID", "roundNum"])
-            win = states[["winningSide"]]
-            win = pd.DataFrame(np.where(win == "CT", 1, 0), columns=["ctPrediction"])
-            states = states[states["tick"] < states["endTickCorrect"]].drop(columns=["endTickCorrect"])
-            am = AnalyticModule("model.pkl")
-            states["ctPrediction"] = am.get_predictions(states)
-            res = res.merge(states[["tick", "ctPrediction"]], how="left", on="tick")
-            res[["ctPrediction"]] = res[["ctPrediction"]].fillna(win)
-
-        for col in res.columns:
-            if res[col].dtypes == "bool":
-                res[col] = res[col].replace({False: "", True: "1"})
         return res
+
+    def get_ratings(self, add_pred=True):
+        self.log.debug(f"Creating rating table and adding predictions to frame: {add_pred}")
+        states = self.match_df.copy()
+        states["mapName"] = self.match_info["mapName"][0]
+        states = states.merge(self.rounds[["matchID", "roundNum", "endTickCorrect", "winningSide"]], how="left",
+                              on=["matchID", "roundNum"])
+        states = pd.concat([states, pd.Series(np.where(states["tick"] >= states["endTickCorrect"], 1, 0), name="gameEnded")], axis=1)
+        states = states.drop(columns=["endTickCorrect"])
+        score = self.rounds.copy()
+        score = score[["roundNum", "ctScore", "tScore"]]
+        damages = self.damages.copy()
+        kills = self.kills.copy()
+        am = AnalyticModule("model.pkl")
+        pred, ratings, moments = am.get_all(states, score, damages, kills)
+        ratings["matchID"] = self.match_id
+        ratings["ID"] = range(1, ratings.shape[0] + 1)
+        if add_pred:
+            self.match_df["importantMoment"] = moments
+            self.match_df["ctPrediction"] = pred
+        return ratings
 
     def get_player_data(self):
         self.log.debug("Creating player table")
@@ -213,7 +226,7 @@ class GameEtl:
                                f'teamName = \"{row["teamName"]}\"', con=self.db_con)
 
     def get_player_id(self, row):
-        self.log.debug(f'Getting player id for player: {row["name"]}')
+        self.log.debug(f'Getting player id for player: \"{row["name"]}\"')
         player_id = self.get_player_id_from_db(row)
         if player_id.empty:
             row.to_frame().T.to_sql(name="player", con=self.db_con, if_exists="append", index=False)
@@ -249,6 +262,11 @@ class GameEtl:
         match_id = self.get_match_id_from_db().iloc[0, 0]
         self.log.debug(f"Game id is {match_id}")
         return match_id
+
+    def invalidate_match(self):
+        self.log.info(f"Invalidating game: {self.match_id}")
+        with self.db_con.begin() as connection:
+            connection.execute(f"UPDATE game SET valid=0 WHERE ID={self.match_id};")
 
     def get_dataframe(self, df, player_types, tick_flag=True):
         self.log.debug("Creating basic table")

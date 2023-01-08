@@ -17,6 +17,7 @@ class PlayerDto(models.Model):
     kast = models.FloatField()
     flashedEnemies = models.IntegerField()
     flashedEnemiesDuration = models.FloatField()
+    rating = models.FloatField()
 
     @staticmethod
     def create(player, game_id, n_rounds, kills, damages, flashes):
@@ -45,6 +46,9 @@ class PlayerDto(models.Model):
             flash = {'countFlash': 0, 'sumDuration': 0.0}
         player_dto.flashedEnemies = flash['countFlash']
         player_dto.flashedEnemiesDuration = flash['sumDuration']
+        player_dto.rating = Rating.objects.filter(matchid_id=game_id, playerid=player.id).values('roundnum')\
+            .order_by('roundnum').annotate(roundRating=models.Sum('gainvalue'))\
+            .aggregate(rating=models.Avg('roundRating'))['rating']
         return player_dto
 
     class Meta:

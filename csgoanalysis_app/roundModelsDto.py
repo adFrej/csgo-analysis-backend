@@ -6,6 +6,7 @@ log = logging.getLogger(__name__)
 
 player_types = [('tplayer_' + str(i + 1), i) for i in range(5)] + [('ctplayer_' + str(i + 1), i+5) for i in range(5)]
 grenade_lengths = {'Smoke Grenade': 18, 'Incendiary Grenade': 7, 'Molotov': 7}  # seconds
+roundEndReason = {'TerroristsWin': 'elimination', 'CTWin': 'elimination', 'TargetSaved': 'timed', 'TargetBombed': 'bombed', 'BombDefused': 'defused'}
 vertigo_divider = 11680
 nuke_divider = -482
 
@@ -16,6 +17,19 @@ def get_radar_slice(z, map_name):
     if map_name == "de_nuke" and z < nuke_divider:
         return 1
     return 0
+
+
+class RoundPlayerRatingDto(models.Model):
+    type = models.TextField(primary_key=True)
+    gainValue = models.FloatField()
+
+    @staticmethod
+    def create(row):
+        log.debug(f"Creating round player rating of type: {row['type']}")
+        player_rating_dto = RoundPlayerRatingDto()
+        player_rating_dto.type = row["type"]
+        player_rating_dto.gainValue = row["sumGain"]
+        return player_rating_dto
 
 
 class RoundPlayerDto(models.Model):
@@ -63,10 +77,12 @@ class RoundPlayerDto(models.Model):
     # z = []
     # zoomlevel = []
     radarSlice = []
+    sumRating = models.FloatField()
+    ratings = []
 
     @staticmethod
     def create(frame, player_type, player, id_, round_, map_name):
-        log.debug(f"Creating round player with id: {id_} and name: {player.name}")
+        log.debug(f"Creating round player {id_} with id: {player.id} and name: {player.name}")
         player_dto = RoundPlayerDto()
         player_dto.id = id_
         player_dto.name = player.name
@@ -114,6 +130,11 @@ class RoundPlayerDto(models.Model):
         # player_dto.z = list(frame.values_list(player_type + '_y', flat=True))
         # player_dto.zoomlevel = list(frame.values_list(player_type + '_zoomlevel', flat=True))
         player_dto.radarSlice = [get_radar_slice(z, map_name) for z in list(frame.values_list(player_type + '_z', flat=True))]
+        player_dto.ratings = []
+        ratings = Rating.objects.filter(matchid_id=round_.matchid_id, roundnum=round_.roundnum, playerid=player.id)
+        player_dto.sumRating = ratings.aggregate(sum=models.Sum('gainvalue'))['sum']
+        for rating in ratings.values('type').order_by('type').annotate(sumGain=models.Sum('gainvalue')):
+            player_dto.ratings.append(RoundPlayerRatingDto.create(rating))
         return player_dto
 
 
@@ -168,8 +189,10 @@ class RoundDto(models.Model):
     tScore = models.PositiveSmallIntegerField()
     ctScore = models.PositiveSmallIntegerField()
     length = models.IntegerField()
-    end = models.IntegerField()
+    winningCondition = models.TextField()
+    winningMoment = models.IntegerField()
     clockTime = []
+    importantMoments = []
     CTpredictions = []
     players = [None] * 10
     bomb = RoundBombDto()
@@ -187,8 +210,10 @@ class RoundDto(models.Model):
         round_dto.ctScore = round_.ctscore
         frame = Frame.objects.filter(matchid_id=round_.matchid_id, roundnum=round_.roundnum)
         round_dto.length = frame.count()
-        round_dto.end = frame.filter(tick__lte=round_.endtickcorrect).count()
+        round_dto.winningCondition = roundEndReason[round_.roundendreason]
+        round_dto.winningMoment = frame.filter(tick__lte=round_.endtickcorrect).count()
         round_dto.clockTime = list(frame.values_list('clocktime', flat=True))
+        round_dto.importantMoments = [i for i, m in enumerate(list(frame.values_list('importantmoment', flat=True))) if m]
         round_dto.CTpredictions = list(frame.values_list('ctPrediction', flat=True))
         game = Game.objects.filter(id=round_.matchid_id).get()
         tick_rate = game.tickrate
@@ -197,7 +222,7 @@ class RoundDto(models.Model):
         for i, (player_type, id_) in enumerate(player_types):
             round_dto.players[i] = RoundPlayerDto.create(
                 frame, player_type, frame.select_related(player_type).first().__getattribute__(player_type), id_, round_, map_name)
-        round_dto.bomb = RoundBombDto.create(frame, map_name, round_dto.end, round_.roundendreason)
+        round_dto.bomb = RoundBombDto.create(frame, map_name, round_dto.winningMoment, round_.roundendreason)
         start_tick = frame.first().tick
         grenades = []
         for grenade in Grenade.objects.filter(matchid_id=round_.matchid_id, roundnum=round_.roundnum):

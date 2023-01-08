@@ -12,8 +12,6 @@ from .GameEtl import GameEtl
 import os
 import logging
 
-logging.basicConfig(level=os.environ.get("LOGLEVEL", "INFO"),
-                    format='%(asctime)s - %(name)s - [%(levelname)s]: %(message)s')
 log = logging.getLogger(__name__)
 
 
@@ -24,7 +22,7 @@ def hello(request):
 @api_view(['GET'])
 def get_games(request):
     log.info("Getting all games")
-    games = Game.objects.all()
+    games = Game.objects.filter(valid=True)
     games = [GameSmallDto.from_game(game) for game in games]
     return Response(GameSmallDtoSerializer(games, many=True).data, status=status.HTTP_200_OK)
 
@@ -76,6 +74,12 @@ def upload_file(request, name="standard"):
                  settings.DATABASES['default']['NAME'] + r"?allow_local_infile=1"
     path = default_storage.save(file_obj.name, ContentFile(file_obj.read()))
     game_etl = GameEtl(directory=settings.MEDIA_ROOT, demo_file=path, match_name=name, db_con_str=db_con_str)
-    game_id = game_etl.etl()
+    try:
+        game_id = game_etl.etl()
+    except Exception as e:
+        log.warning(f"Exception occurred while parsing dem file: \"{file_obj.name}\". Exception: {e}")
+        os.remove(os.path.join(settings.MEDIA_ROOT, path))
+        return Response("Error parsing dem file.", status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     os.remove(os.path.join(settings.MEDIA_ROOT, path))
+    log.info(f"Created new game with id: {game_id}")
     return Response("{game_id: " + str(game_id) + "}", status=status.HTTP_201_CREATED)
