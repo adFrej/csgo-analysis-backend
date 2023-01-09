@@ -11,3 +11,4 @@ scikit-learn~=1.2.0
 sympy~=1.11.1
 shapely~=2.0.0
 lightgbm~=3.3.3
+django-cors-headers~=3.13.0
