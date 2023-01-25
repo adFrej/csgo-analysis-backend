@@ -82,4 +82,4 @@ def upload_file(request, name="standard"):
         return Response("Error parsing dem file.", status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     os.remove(os.path.join(settings.MEDIA_ROOT, path))
     log.info(f"Created new game with id: {game_id}")
-    return Response("{game_id: " + str(game_id) + "}", status=status.HTTP_201_CREATED)
+    return Response("{\"game_id\": " + str(game_id) + "}", status=status.HTTP_201_CREATED)

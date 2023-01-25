@@ -213,7 +213,7 @@ class RoundDto(models.Model):
         round_dto.winningCondition = roundEndReason[round_.roundendreason]
         round_dto.winningMoment = frame.filter(tick__lte=round_.endtickcorrect).count()
         round_dto.clockTime = list(frame.values_list('clocktime', flat=True))
-        round_dto.importantMoments = [i for i, m in enumerate(list(frame.values_list('importantmoment', flat=True))) if m]
+        round_dto.importantMoments = list(frame.values_list('importantmoment', flat=True))
         round_dto.CTpredictions = list(frame.values_list('ctPrediction', flat=True))
         game = Game.objects.filter(id=round_.matchid_id).get()
         tick_rate = game.tickrate
