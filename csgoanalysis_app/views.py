@@ -39,17 +39,6 @@ def get_game(request, game_id):
 
 
 @api_view(['GET'])
-def get_rounds(request, game_id):
-    log.info(f"Getting all rounds for game with id: {game_id}")
-    try:
-        Game.objects.get(id=game_id)
-    except Game.DoesNotExist:
-        return Response(status=status.HTTP_404_NOT_FOUND)
-    rounds = [RoundDto.from_round(round_) for round_ in Round.objects.filter(matchid=game_id)]
-    return Response(RoundDtoSerializer(rounds, many=True).data, status=status.HTTP_200_OK)
-
-
-@api_view(['GET'])
 def get_round(request, game_id, round_id):
     log.info(f"Getting round with id: {round_id} for game with id: {game_id}")
     try:
