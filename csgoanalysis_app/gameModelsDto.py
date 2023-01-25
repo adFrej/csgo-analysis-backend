@@ -97,6 +97,7 @@ class TeamsDto(models.Model):
 class GameDto(models.Model):
     id = models.PositiveSmallIntegerField(primary_key=True)
     name = models.TextField()
+    createdTimestamp = models.DateTimeField()
     map = models.TextField()
     roundsPlayed = models.PositiveSmallIntegerField()
     teams = TeamsDto()
@@ -108,6 +109,7 @@ class GameDto(models.Model):
         game_dto = GameDto()
         game_dto.id = game.id
         game_dto.name = game.matchname
+        game_dto.createdTimestamp = game.createdtimestamp
         game_dto.map = game.mapname
         game_dto.roundsPlayed = rounds.count()
         game_dto.teams = TeamsDto.create(rounds, game.id, game_dto.roundsPlayed)
@@ -120,6 +122,8 @@ class GameDto(models.Model):
 class GameSmallDto(models.Model):
     id = models.PositiveSmallIntegerField(primary_key=True)
     name = models.TextField()
+    createdTimestamp = models.DateTimeField()
+    map = models.TextField()
 
     @staticmethod
     def from_game(game):
@@ -127,6 +131,8 @@ class GameSmallDto(models.Model):
         game_dto = GameSmallDto()
         game_dto.id = game.id
         game_dto.name = game.matchname
+        game_dto.createdTimestamp = game.createdtimestamp
+        game_dto.map = game.mapname
         return game_dto
 
     class Meta:

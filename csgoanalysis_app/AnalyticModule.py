@@ -17,8 +17,8 @@ class AnalyticModule:
     TRADE_GAIN = 0.2
     FLASH_PENALTY = 0.2
     KILL_DAMAGE_PENALTY = 0.8
-    DIFF_IMPORTANT_MOMENTS = 0.15
-    FRAMES_IMPORTANT_MOMENTS = 20
+    DIFF_IMPORTANT_MOMENTS = 0.1
+    FRAMES_IMPORTANT_MOMENTS = 10
     __slots__ = ["input_data", "model", "log", "map_encoder", "bomb_encoder"]
 
     def __init__(self, model_path):

@@ -62,7 +62,7 @@ def get_round(request, game_id, round_id):
 
 @api_view(['POST'])
 @parser_classes([MultiPartParser])
-def upload_file(request, name="standard"):
+def upload_file(request, name=None):
     if "file" not in request.FILES.keys():
         return Response("Missing file in request.", status=status.HTTP_400_BAD_REQUEST)
     file_obj = request.FILES["file"]
@@ -82,4 +82,4 @@ def upload_file(request, name="standard"):
         return Response("Error parsing dem file.", status=status.HTTP_500_INTERNAL_SERVER_ERROR)
     os.remove(os.path.join(settings.MEDIA_ROOT, path))
     log.info(f"Created new game with id: {game_id}")
-    return Response("{\"game_id\": " + str(game_id) + "}", status=status.HTTP_201_CREATED)
+    return Response("{game_id: " + str(game_id) + "}", status=status.HTTP_201_CREATED)
