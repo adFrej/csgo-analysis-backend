@@ -674,12 +674,12 @@ class AnalyticModule:
             max_index = index + self.FRAMES_IMPORTANT_MOMENTS
             min_index = index - self.FRAMES_IMPORTANT_MOMENTS
             round_ = connected.loc[index, "roundNum"].item()
-            if index == max_index:
+            if index == indexes_round[round_][1]:
                 connected.loc[index, "important_moments"] = False
             else:
                 if min_index < indexes_round[round_][0]:
                     min_index = indexes_round[round_][0]
                 if max_index > indexes_round[round_][1]:
                     max_index = indexes_round[round_][1]
-            connected.loc[min_index:max_index, "important_moments"] = True
+                connected.loc[min_index:max_index, "important_moments"] = True
         return connected
