@@ -47,7 +47,8 @@ class PlayerDto(models.Model):
         player_dto.flashedEnemies = flash['countFlash']
         player_dto.flashedEnemiesDuration = flash['sumDuration']
         player_dto.rating = Rating.objects.filter(matchid_id=game_id, playerid=player.id)\
-            .aggregate(rating=models.Sum('gainvalue'))['rating'] / n_rounds
+            .aggregate(rating=models.Sum('gainvalue'))['rating']
+        player_dto.rating = player_dto.rating / n_rounds if player_dto.rating is not None else 0
         return player_dto
 
     class Meta:
