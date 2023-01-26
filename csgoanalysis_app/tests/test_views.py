@@ -20,21 +20,23 @@ class GameTests(APITestCase):
     team_dto.lastTSide = team_dto
     teams_dto.lastCTSide = team_dto
 
-    game_dto = GameDto(map="test_map", roundsPlayed=30)
+    game_dto = GameDto(name="test_name", createdTimestamp="2023-01-15T15:16:17", map="test_map", roundsPlayed=30)
     game_dto.teams = teams_dto
 
-    @patch("csgoanalysis_app.models.Game.objects.all")
-    @patch("csgoanalysis_app.gameModelsDto.GameDto.from_game")
+    game_small_dto = GameDto(name="test_name", createdTimestamp="2023-01-15T15:16:17", map="test_map")
+
+    @patch("csgoanalysis_app.models.Game.objects.filter")
+    @patch("csgoanalysis_app.gameModelsDto.GameSmallDto.from_game")
     def test_get_games(self, mock_from_game, mock_games):
         mock_games.return_value = [Game()]
-        mock_from_game.return_value = self.game_dto
+        mock_from_game.return_value = self.game_small_dto
 
         url = reverse("csgoanalysis_app:get_games")
         response = self.client.get(url)
 
         self.assertEqual(response.status_code, status.HTTP_200_OK)
         self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data, GameDtoSerializer([self.game_dto], many=True).data)
+        self.assertEqual(response.data, GameSmallDtoSerializer([self.game_small_dto], many=True).data)
 
     @patch("csgoanalysis_app.models.Game.objects.get")
     @patch("csgoanalysis_app.gameModelsDto.GameDto.from_game")
@@ -76,31 +78,6 @@ class RoundTests(APITestCase):
 
     round_dto = RoundDto(roundNumber=5, tName="test_t_name", ctName="test_ct_name", tScore=3, ctScore=2, length=100)
     round_dto.players = [round_player_dto]
-
-    @patch("csgoanalysis_app.models.Game.objects.get")
-    @patch("csgoanalysis_app.models.Round.objects.filter")
-    @patch("csgoanalysis_app.roundModelsDto.RoundDto.from_round")
-    def test_get_rounds_game_ok(self, mock_from_round, mock_rounds, mock_game):
-        mock_game.return_value = Game()
-        mock_rounds.return_value = [Round()]
-        mock_from_round.return_value = self.round_dto
-
-        url = reverse("csgoanalysis_app:get_rounds", args=[1])
-        response = self.client.get(url)
-
-        self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 1)
-        self.assertEqual(response.data, RoundDtoSerializer([self.round_dto], many=True).data)
-
-    @patch("csgoanalysis_app.models.Game.objects.get")
-    def test_get_rounds_game_not_found(self, mock_game):
-        mock_game.side_effect = Game.DoesNotExist()
-
-        url = reverse("csgoanalysis_app:get_rounds", args=[1])
-        response = self.client.get(url)
-
-        self.assertEqual(response.status_code, status.HTTP_404_NOT_FOUND)
-        self.assertEqual(response.data, None)
 
     @patch("csgoanalysis_app.models.Round.objects.get")
     @patch("csgoanalysis_app.roundModelsDto.RoundDto.from_round")
@@ -160,6 +137,23 @@ class UploadTests(APITestCase):
 
             self.assertEqual(response.status_code, status.HTTP_415_UNSUPPORTED_MEDIA_TYPE)
             self.assertEqual(response.data, "Only .dem files accepted.")
+
+    @patch("django.core.files.storage.default_storage.save")
+    @patch("csgoanalysis_app.GameEtl.GameEtl.etl")
+    @patch("os.remove")
+    def test_post_upload_error_etl(self, mock_os_remove, mock_game_etl, mock_storage_save):
+        mock_storage_save.return_value = "test_path"
+        mock_game_etl.side_effect = Exception("Test exception.")
+
+        with tempfile.NamedTemporaryFile(suffix=".dem") as dem_file:
+            dem_file.write(b"testtest")
+            dem_file.seek(0)
+
+            url = reverse("csgoanalysis_app:upload_file")
+            response = self.client.post(url, data={"file": dem_file}, format="multipart")
+
+            self.assertEqual(response.status_code, status.HTTP_500_INTERNAL_SERVER_ERROR)
+            self.assertEqual(response.data, "Error parsing dem file.")
 
     @patch("django.core.files.storage.default_storage.save")
     @patch("csgoanalysis_app.GameEtl.GameEtl.etl")
